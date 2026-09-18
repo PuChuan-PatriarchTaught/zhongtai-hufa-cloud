@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>護法會雲端系統 - 精舍後台管理</title>
+<style>
+  body {
+    font-family: "微軟正黑體", "PMingLiU", sans-serif;
+    background: #f4f6f9;
+    color: #222;
+    margin: 0;
+    padding: 24px 16px 60px 16px;
+  }
+  .wrap {
+    max-width: 640px;
+    margin: 0 auto;
+  }
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+  .topbar h1 {
+    font-size: 19px;
+    color: #1F3864;
+    margin: 0;
+  }
+  .topbar .temple-name {
+    color: #2E5395;
+    font-weight: bold;
+  }
+  #btnLogout {
+    background: #888;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 14px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  #btnLogout:hover { background: #555; }
+
+  .card {
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    padding: 20px 24px;
+    margin-bottom: 22px;
+  }
+  .card h2 {
+    font-size: 16px;
+    color: #2E5395;
+    margin: 0 0 4px 0;
+    border-bottom: 1px solid #e5e5e5;
+    padding-bottom: 8px;
+  }
+  .card .desc {
+    color: #777;
+    font-size: 12.5px;
+    margin: 8px 0 16px 0;
+  }
+  label {
+    display: block;
+    font-weight: bold;
+    font-size: 13.5px;
+    margin: 12px 0 6px 0;
+  }
+  input[type=text], input[type=password] {
+    width: 100%;
+    padding: 8px 10px;
+    box-sizing: border-box;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+  button.action {
+    margin-top: 18px;
+    padding: 9px 18px;
+    background: #2E5395;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  button.action:disabled {
+    background: #99a8c2;
+    cursor: not-allowed;
+  }
+  button.action:hover:not(:disabled) { background: #1F3864; }
+
+  .msg { margin-top: 12px; font-size: 13px; min-height: 18px; }
+  .msg.error { color: #c00; }
+  .msg.success { color: #1a7f37; }
+  .msg.info { color: #666; }
+
+  #loadingNotice {
+    text-align: center;
+    color: #666;
+    padding: 40px 0;
+  }
+</style>
+</head>
+<body>
+
+<div id="loadingNotice">載入中，請稍候...</div>
+
+<div class="wrap" id="mainContent" style="display:none;">
+
+  <div class="topbar">
+    <h1>精舍後台管理　<span class="temple-name" id="templeNameShow"></span></h1>
+    <div>
+      <a href="session-admin.html" style="margin-right:8px; color:#2E5395; font-size:13px;">報到場次管理 →</a>
+      <a href="report-admin.html" style="margin-right:8px; color:#2E5395; font-size:13px;">提報名單資料組操作 →</a>
+      <button id="btnLogout" onclick="處理登出按鈕點擊()">登出</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>修改精舍密碼</h2>
+    <div class="desc">
+      新精舍預設密碼為 1234，是否修改由貴精舍自行決定，不強制。若不修改，可以繼續使用預設密碼。
+    </div>
+
+    <label for="inputOldPassword">目前密碼</label>
+    <input type="password" id="inputOldPassword" autocomplete="off">
+
+    <label for="inputNewPassword">新密碼</label>
+    <input type="password" id="inputNewPassword" autocomplete="off">
+
+    <label for="inputNewPasswordConfirm">再輸入一次新密碼</label>
+    <input type="password" id="inputNewPasswordConfirm" autocomplete="off">
+
+    <button class="action" id="btnChangePassword" onclick="處理修改密碼按鈕點擊()">修改密碼</button>
+    <div class="msg" id="msgChangePassword"></div>
+  </div>
+
+  <div class="card">
+    <h2>試算表 ID 設定</h2>
+    <div class="desc">
+      請填入貴精舍對應的 6 種 Google 試算表 ID（試算表網址中 /d/ 與 /edit 之間的一長串英數字）。
+      未填寫的欄位會維持原本設定不變。
+    </div>
+
+    <label for="input資料庫試算表ID">資料庫試算表ID</label>
+    <input type="text" id="input資料庫試算表ID" autocomplete="off">
+
+    <label for="input名單回報試算表ID">名單回報試算表ID</label>
+    <input type="text" id="input名單回報試算表ID" autocomplete="off">
+
+    <label for="input出席回報試算表ID">出席回報試算表ID</label>
+    <input type="text" id="input出席回報試算表ID" autocomplete="off">
+
+    <label for="input報到名單試算表ID">報到名單試算表ID</label>
+    <input type="text" id="input報到名單試算表ID" autocomplete="off">
+
+    <label for="input封存備查試算表ID">封存備查試算表ID</label>
+    <input type="text" id="input封存備查試算表ID" autocomplete="off">
+
+    <label for="input學員基本資料試算表ID">學員基本資料試算表ID</label>
+    <input type="text" id="input學員基本資料試算表ID" autocomplete="off">
+
+    <button class="action" id="btnSaveSheets" onclick="處理儲存試算表ID按鈕點擊()">儲存試算表 ID 設定</button>
+    <div class="msg" id="msgSaveSheets"></div>
+  </div>
+
+</div>
+
+<script src="config.js"></script>
+<script>
+
+const ARR_試算表欄位名稱 = [
+  "資料庫試算表ID",
+  "名單回報試算表ID",
+  "出席回報試算表ID",
+  "報到名單試算表ID",
+  "封存備查試算表ID",
+  "學員基本資料試算表ID"
+];
+
+function 顯示區塊訊息(strMsgElementId, str訊息內容, str樣式) {
+  const elMsg = document.getElementById(strMsgElementId);
+  elMsg.textContent = str訊息內容;
+  elMsg.className = "msg " + str樣式;
+}
+
+function 處理登出按鈕點擊() {
+  清除登入精舍資訊();
+  window.location.href = "login.html";
+}
+
+async function 處理修改密碼按鈕點擊() {
+  const str舊密碼 = document.getElementById("inputOldPassword").value;
+  const str新密碼 = document.getElementById("inputNewPassword").value;
+  const str新密碼確認 = document.getElementById("inputNewPasswordConfirm").value;
+  const btn修改密碼按鈕 = document.getElementById("btnChangePassword");
+
+  if (!str舊密碼 || !str新密碼 || !str新密碼確認) {
+    顯示區塊訊息("msgChangePassword", "請完整填寫目前密碼與兩次新密碼。", "error");
+    return;
+  }
+  if (str新密碼 !== str新密碼確認) {
+    顯示區塊訊息("msgChangePassword", "兩次輸入的新密碼不一致，請重新輸入。", "error");
+    return;
+  }
+  if (str新密碼.length < 4) {
+    顯示區塊訊息("msgChangePassword", "新密碼長度至少需要 4 碼。", "error");
+    return;
+  }
+
+  const obj登入資訊 = 取得目前登入精舍資訊();
+  if (!obj登入資訊) {
+    顯示區塊訊息("msgChangePassword", "登入狀態已失效，請重新登入。", "error");
+    setTimeout(() => { window.location.href = "login.html"; }, 1500);
+    return;
+  }
+
+  btn修改密碼按鈕.disabled = true;
+  顯示區塊訊息("msgChangePassword", "處理中，請稍候...", "info");
+
+  try {
+    const objResult = await 呼叫後端API({
+      system: "temple",
+      action: "精舍修改密碼",
+      token: obj登入資訊.token,
+      舊密碼: str舊密碼,
+      新密碼: str新密碼
+    });
+
+    if (objResult.成功) {
+      顯示區塊訊息("msgChangePassword", "密碼修改成功，下次登入請使用新密碼。", "success");
+      document.getElementById("inputOldPassword").value = "";
+      document.getElementById("inputNewPassword").value = "";
+      document.getElementById("inputNewPasswordConfirm").value = "";
+    } else {
+      顯示區塊訊息("msgChangePassword", objResult.訊息 || "密碼修改失敗，請確認目前密碼是否正確。", "error");
+    }
+  } catch (錯誤) {
+    console.error("修改密碼過程發生未預期錯誤：", 錯誤);
+    顯示區塊訊息("msgChangePassword", "系統發生未預期錯誤，請稍後再試或聯絡工程人員。", "error");
+  } finally {
+    btn修改密碼按鈕.disabled = false;
+  }
+}
+
+async function 處理儲存試算表ID按鈕點擊() {
+  const obj登入資訊 = 取得目前登入精舍資訊();
+  if (!obj登入資訊) {
+    顯示區塊訊息("msgSaveSheets", "登入狀態已失效，請重新登入。", "error");
+    setTimeout(() => { window.location.href = "login.html"; }, 1500);
+    return;
+  }
+
+  const obj試算表ID物件 = {};
+  let int已填寫欄位數 = 0;
+  ARR_試算表欄位名稱.forEach(function (str欄位名稱) {
+    const str輸入值 = document.getElementById("input" + str欄位名稱).value.trim();
+    if (str輸入值) {
+      obj試算表ID物件[str欄位名稱] = str輸入值;
+      int已填寫欄位數 = int已填寫欄位數 + 1;
+    }
+  });
+
+  if (int已填寫欄位數 === 0) {
+    顯示區塊訊息("msgSaveSheets", "請至少填寫一個試算表 ID 欄位後再儲存。", "error");
+    return;
+  }
+
+  const btn儲存按鈕 = document.getElementById("btnSaveSheets");
+  btn儲存按鈕.disabled = true;
+  顯示區塊訊息("msgSaveSheets", "儲存中，請稍候...", "info");
+
+  try {
+    const objResult = await 呼叫後端API({
+      system: "temple",
+      action: "精舍設定試算表ID",
+      token: obj登入資訊.token,
+      試算表ID物件: obj試算表ID物件
+    });
+
+    if (objResult.成功) {
+      顯示區塊訊息("msgSaveSheets", "試算表 ID 設定已儲存。", "success");
+      await 載入目前精舍設定();
+    } else {
+      顯示區塊訊息("msgSaveSheets", objResult.訊息 || "儲存失敗，請確認輸入內容是否正確。", "error");
+    }
+  } catch (錯誤) {
+    console.error("儲存試算表ID過程發生未預期錯誤：", 錯誤);
+    顯示區塊訊息("msgSaveSheets", "系統發生未預期錯誤，請稍後再試或聯絡工程人員。", "error");
+  } finally {
+    btn儲存按鈕.disabled = false;
+  }
+}
+
+async function 載入目前精舍設定() {
+  const obj登入資訊 = 取得目前登入精舍資訊();
+  if (!obj登入資訊) { return; }
+
+  try {
+    const objResult = await 呼叫後端API({
+      system: "temple",
+      action: "精舍取得自己的設定",
+      token: obj登入資訊.token
+    });
+
+    if (objResult.成功 && objResult.設定) {
+      ARR_試算表欄位名稱.forEach(function (str欄位名稱) {
+        const elInput = document.getElementById("input" + str欄位名稱);
+        elInput.value = objResult.設定[str欄位名稱] || "";
+      });
+    }
+  } catch (錯誤) {
+    console.error("載入目前精舍設定時發生錯誤：", 錯誤);
+  }
+}
+
+async function 初始化頁面() {
+  const obj登入資訊 = 取得目前登入精舍資訊();
+
+  if (!obj登入資訊) {
+    window.location.href = "login.html";
+    return;
+  }
+
+  document.getElementById("templeNameShow").textContent = "（" + obj登入資訊.精舍顯示名稱 + "）";
+  document.getElementById("loadingNotice").style.display = "none";
+  document.getElementById("mainContent").style.display = "block";
+
+  await 載入目前精舍設定();
+}
+
+初始化頁面();
+
+</script>
+
+</body>
+</html>
