@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>護法會雲端系統 - 報到場次管理</title>
+<style>
+  /*
+   * ============================================================
+   * 檔案：報到系統場次管理頁面
+   * 版本：v1.0（2026-09-16）
+   * 說明：
+   *   精舍登入後（沿用「精舍後台管理」同一套登入狀態）的報到
+   *   場次管理頁面，提供三項功能：建立場次（貼上出席名單）、
+   *   查看場次清單與報到進度、刪除場次。
+   *   進入本頁前會先檢查 sessionStorage 是否有登入資訊，沒有就
+   *   導回登入頁面（跟 temple-admin.html 邏輯一致）。
+   * ============================================================
+   */
+  body {
+    font-family: "微軟正黑體", "PMingLiU", sans-serif;
+    background: #f4f6f9;
+    color: #222;
+    margin: 0;
+    padding: 24px 16px 60px 16px;
+  }
+  .wrap {
+    max-width: 780px;
+    margin: 0 auto;
+  }
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .topbar h1 {
+    font-size: 19px;
+    color: #1F3864;
+    margin: 0;
+  }
+  .topbar .temple-name {
+    color: #2E5395;
+    font-weight: bold;
+  }
+  .topbar-buttons a, .topbar-buttons button {
+    background: #888;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 14px;
+    cursor: pointer;
+    font-size: 13px;
+    text-decoration: none;
+    margin-left: 8px;
+  }
+  .topbar-buttons a:hover, .topbar-buttons button:hover { background: #555; }
+
+  .card {
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    padding: 20px 24px;
+    margin-bottom: 22px;
+  }
+  .card h2 {
+    font-size: 16px;
+    color: #2E5395;
+    margin: 0 0 4px 0;
+    border-bottom: 1px solid #e5e5e5;
+    padding-bottom: 8px;
+  }
+  .card .desc {
+    color: #777;
+    font-size: 12.5px;
+    margin: 8px 0 16px 0;
+    line-height: 1.6;
+  }
+  label {
+    display: block;
+    font-weight: bold;
+    font-size: 13.5px;
+    margin: 12px 0 6px 0;
+  }
+  input[type=text] {
+    width: 100%;
+    padding: 8px 10px;
+    box-sizing: border-box;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+  textarea {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: Consolas, "微軟正黑體", monospace;
+    padding: 8px 10px;
+    min-height: 140px;
+    resize: vertical;
+  }
+  button.action {
+    margin-top: 18px;
+    padding: 9px 18px;
+    background: #2E5395;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  button.action:disabled { background: #99a8c2; cursor: not-allowed; }
+  button.action:hover:not(:disabled) { background: #1F3864; }
+  button.danger {
+    background: #b3372c;
+  }
+  button.danger:hover:not(:disabled) { background: #8a2a21; }
+
+  .msg { margin-top: 12px; font-size: 13px; min-height: 18px; }
+  .msg.error { color: #c00; }
+  .msg.success { color: #1a7f37; }
+  .msg.info { color: #666; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    font-size: 13.5px;
+  }
+  th, td {
+    border: 1px solid #e0e0e0;
+    padding: 8px 10px;
+    text-align: left;
+  }
+  th {
+    background: #f0f3f8;
+    color: #333;
+  }
+  .progress-bar-bg {
+    background: #e5e5e5;
+    border-radius: 4px;
+    width: 100%;
+    height: 8px;
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    background: #2E5395;
+    height: 100%;
+  }
+  .btn-delete {
+    background: #b3372c;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    padding: 5px 10px;
+    font-size: 12.5px;
+    cursor: pointer;
+  }
+  .btn-delete:hover { background: #8a2a21; }
+  .empty-hint {
+    color: #999;
+    font-size: 13px;
+    padding: 10px 0;
+  }
+
+  #loadingNotice {
+    text-align: center;
+    color: #666;
+    padding: 40px 0;
+  }
+</style>
+</head>
+<body>
+
+<div id="loadingNotice">載入中，請稍候...</div>
+
+<div class="wrap" id="mainContent" style="display:none;">
+
+  <div class="topbar">
+    <h1>報到場次管理　<span class="temple-name" id="templeNameShow"></span></h1>
+    <div class="topbar-buttons">
+      <a href="temple-admin.html">回精舍後台管理</a>
+      <button onclick="處理登出按鈕點擊()">登出</button>
+    </div>
+  </div>
+
+  <!-- 卡片一：建立新場次 -->
+  <div class="card">
+    <h2>建立新場次</h2>
+    <div class="desc">
+      場次代碼將同時作為試算表分頁名稱，建議使用日期或簡短活動代號（例如 1023、2026頒證大典），
+      建立後不建議更改。出席名單請從 Excel 複製整欄整列後直接貼上，欄位順序須為：
+      學員編號、姓名、法名、性別、組別、職稱、備註、注意事項（共 8 欄，不含序號／報到／報到時間，
+      這三欄由系統自動處理）。
+    </div>
+
+    <label for="inputSessionCode">場次代碼</label>
+    <input type="text" id="inputSessionCode" autocomplete="off" placeholder="例如：1023">
+
+    <label for="inputSessionName">場次名稱（選填，畫面顯示用，留空則直接使用場次代碼）</label>
+    <input type="text" id="inputSessionName" autocomplete="off" placeholder="例如：護法會幹部聯誼">
+
+    <label for="inputAnnouncement">法會公告文字（選填，供報到頁顯示給大眾）</label>
+    <input type="text" id="inputAnnouncement" autocomplete="off" placeholder="例如：請提前30分鐘到場">
+
+    <label for="inputAttendeeList">出席名單（從 Excel 複製貼上）</label>
+    <textarea id="inputAttendeeList" placeholder="學員編號［Tab］姓名［Tab］法名［Tab］性別［Tab］組別［Tab］職稱［Tab］備註［Tab］注意事項&#10;每人一行，直接從 Excel 選取範圍複製後貼上即可"></textarea>
+
+    <button class="action" id="btnCreateSession" onclick="處理建立場次按鈕點擊()">建立場次</button>
+    <div class="msg" id="msgCreateSession"></div>
+  </div>
+
+  <!-- 卡片二：場次清單 -->
+  <div class="card">
+    <h2>場次清單與報到進度</h2>
+    <div class="desc">已報到人數會依「報到」欄位即時計算，建立場次後若有人報到，重新整理本頁即可看到最新進度。</div>
+
+    <div id="sessionListArea">
+      <div class="empty-hint">載入中...</div>
+    </div>
+    <div class="msg" id="msgSessionList"></div>
+  </div>
+
+</div>
+
+<script src="config.js"></script>
+<script>
+
+/**
+ * ------------------------------------------------------------
+ * 函式：顯示區塊訊息
+ * 版本：v1.0（2026-09-16）
+ * 用途：在指定的訊息區塊顯示提示、成功或錯誤訊息。
+ * 參數：
+ *   strMsgElementId - 要顯示訊息的元素 id
+ *   str訊息內容      - 顯示的文字
+ *   str樣式           - "error" / "success" / "info" 三選一
+ * 回傳：無
+ * ------------------------------------------------------------
+ */
+function 顯示區塊訊息(strMsgElementId, str訊息內容, str樣式) {
+  const elMsg = document.getElementById(strMsgElementId);
+  elMsg.textContent = str訊息內容;
+  elMsg.className = "msg " + str樣式;
+}
+
+/**
+ * ------------------------------------------------------------
+ * 函式：處理登出按鈕點擊
+ * 版本：v1.0（2026-09-16）
+ * 用途：清除登入資訊並導回登入頁面。
+ * 參數：無
+ * 回傳：無
+ * ------------------------------------------------------------
+ */
+function 處理登出按鈕點擊() {
+  清除登入精舍資訊();
+  window.location.href = "login.html";
+}
+
+/**
+ * ------------------------------------------------------------
+ * 函式：處理建立場次按鈕點擊
+ * 版本：v1.0（2026-09-16）
+ * 用途：讀取畫面上的場次代碼、場次名稱、公告文字、出席名單
+ *       文字，呼叫後端「建立場次」API。成功後清空表單並重新
+ *       載入場次清單，讓畫面立即反映最新狀態。
+ * 參數：無（直接從畫面欄位讀取）
+ * 回傳：無
+ * ------------------------------------------------------------
+ */
+async function 處理建立場次按鈕點擊() {
+  const str場次代碼 = document.getElementById("inputSessionCode").value.trim();
+  const str場次名稱 = document.getElementById("inputSessionName").value.trim();
+  const str公告文字 = document.getElementById("inputAnnouncement").value.trim();
+  const str出席名單文字 = document.getElementById("inputAttendeeList").value;
+
+  if (!str場次代碼) {
+    顯示區塊訊息("msgCreateSession", "請輸入場次代碼。", "error");
+    return;
+  }
+  if (!str出席名單文字 || str出席名單文字.trim() === "") {
+    顯示區塊訊息("msgCreateSession", "請貼上出席名單資料。", "error");
+    return;
+  }
+
+  const obj登入資訊 = 取得目前登入精舍資訊();
+  if (!obj登入資訊) {
+    顯示區塊訊息("msgCreateSession", "登入狀態已失效，請重新登入。", "error");
+    setTimeout(() => { window.location.href = "login.html"; }, 1500);
+    return;
+  }
+
+  const btn建立按鈕 = document.getElementById("btnCreateSession");
+  btn建立按鈕.disabled = true;
+  顯示區塊訊息("msgCreateSession", "建立中，請稍候...", "info");
+
+  try {
+    const objResult = await 呼叫後端API({
+      system: "報到",
+      action: "建立場次",
+      token: obj登入資訊.token,
+      場次代碼: str場次代碼,
+      場次名稱: str場次名稱,
+      公告文字: str公告文字,
+      出席名單文字: str出席名單文字
+    });
+
+    if (objResult.成功) {
+      顯示區塊訊息("msgCreateSession", objResult.訊息 || "建立成功。", "success");
+      document.getElementById("inputSessionCode").value = "";
+      document.getElementById("inputSessionName").value = "";
+      document.getElementById("inputAnnouncement").value = "";
+      document.getElementById("inputAttendeeList").value = "";
+      await 載入場次清單();
+    } else {
+      顯示區塊訊息("msgCreateSession", objResult.訊息 || "建立失敗，請確認輸入內容是否正確。", "error");
+    }
+  } catch (錯誤) {
+    console.error("建立場次過程發生未預期錯誤：", 錯誤);
+    顯示區塊訊息("msgCreateSession", "系統發生未預期錯誤，請稍後再試或聯絡工程人員。", "error");
+  } finally {
+    btn建立按鈕.disabled = false;
+  }
+}
+
+/**
+ * ------------------------------------------------------------
+ * 函式：處理刪除場次按鈕點擊
+ * 版本：v1.0（2026-09-16）
+ * 用途：使用者點擊某場次的「刪除」按鈕後，先跳出瀏覽器原生
+ *       確認對話框二次確認（這是無法復原的操作），確認後才
+ *       呼叫後端「刪除場次」API，成功後重新載入場次清單。
+ * 參數：
+ *   str場次代碼 - 要刪除的場次代碼
+ * 回傳：無
+ * ------------------------------------------------------------
+ */
+async function 處理刪除場次按鈕點擊(str場次代碼) {
+  const bool確認 = window.confirm(
+    "確定要刪除場次「" + str場次代碼 + "」嗎？\n" +
+    "此操作會刪除該場次的整個試算表分頁，包含所有報到紀錄，無法復原！"
+  );
+  if (!bool確認) {
+    return;
+  }
+
+  const obj登入資訊 = 取得目前登入精舍資訊();
+  if (!obj登入資訊) {
+    顯示區塊訊息("msgSessionList", "登入狀態已失效，請重新登入。", "error");
+    setTimeout(() => { window.location.href = "login.html"; }, 1500);
+    return;
+  }
+
+  顯示區塊訊息("msgSessionList", "刪除中，請稍候...", "info");
+
+  try {
+    const objResult = await 呼叫後端API({
+      system: "報到",
+      action: "刪除場次",
+      token: obj登入資訊.token,
+      場次代碼: str場次代碼
+    });
+
+    if (objResult.成功) {
+      顯示區塊訊息("msgSessionList", objResult.訊息 || "刪除成功。", "success");
+      await 載入場次清單();
+    } else {
+      顯示區塊訊息("msgSessionList", objResult.訊息 || "刪除失敗。", "error");
+    }
+  } catch (錯誤) {
+    console.error("刪除場次過程發生未預期錯誤：", 錯誤);
+    顯示區塊訊息("msgSessionList", "系統發生未預期錯誤，請稍後再試或聯絡工程人員。", "error");
+  }
+}
+
+/**
+ * ------------------------------------------------------------
+ * 函式：組出場次清單表格HTML
+ * 版本：v1.0（2026-09-16）
+ * 用途：把後端回傳的場次清單資料，轉成表格形式的 HTML 字串。
+ *       獨立成一個函式方便閱讀與未來調整呈現方式。
+ * 參數：
+ *   arr場次清單 - 後端「查詢場次清單」API 回傳的場次陣列
+ * 回傳：
+ *   str HTML 字串
+ * ------------------------------------------------------------
+ */
+function 組出場次清單表格HTML(arr場次清單) {
+  if (!arr場次清單 || arr場次清單.length === 0) {
+    return "<div class='empty-hint'>目前尚未建立任何場次。</div>";
+  }
+
+  var strHTML = "<table><thead><tr>" +
+    "<th>場次代碼</th><th>場次名稱</th><th>建立時間</th><th>報到進度</th><th>操作</th>" +
+    "</tr></thead><tbody>";
+
+  arr場次清單.forEach(function (obj場次) {
+    var int百分比 = obj場次.總人數 > 0
+      ? Math.round((obj場次.已報到人數 / obj場次.總人數) * 100)
+      : 0;
+
+    strHTML += "<tr>" +
+      "<td>" + 轉義HTML(obj場次.場次代碼) + "</td>" +
+      "<td>" + 轉義HTML(obj場次.場次名稱) + "</td>" +
+      "<td>" + 轉義HTML(obj場次.建立時間) + "</td>" +
+      "<td>" +
+        obj場次.已報到人數 + " / " + obj場次.總人數 + "（" + int百分比 + "%）" +
+        "<div class='progress-bar-bg'><div class='progress-bar-fill' style='width:" + int百分比 + "%'></div></div>" +
+      "</td>" +
+      "<td><button class='btn-delete' onclick=\"處理刪除場次按鈕點擊('" + 轉義單引號(obj場次.場次代碼) + "')\">刪除</button></td>" +
+      "</tr>";
+  });
+
+  strHTML += "</tbody></table>";
+  return strHTML;
+}
+
+/**
+ * ------------------------------------------------------------
+ * 函式：轉義HTML
+ * 版本：v1.0（2026-09-16）
+ * 用途：把場次代碼、名稱等使用者輸入內容轉成安全的 HTML 顯示
+ *       文字，避免資料組貼上的內容剛好含有 < > 等符號時破壞畫面
+ *       排版（基本的 XSS 防護）。
+ * 參數：
+ *   str原始文字 - 任意字串
+ * 回傳：str 已轉義的安全字串
+ * ------------------------------------------------------------
+ */
+function 轉義HTML(str原始文字) {
+  if (str原始文字 === undefined || str原始文字 === null) return "";
+  const div = document.createElement("div");
+  div.textContent = String(str原始文字);
+  return div.innerHTML;
+}
+
+/**
+ * ------------------------------------------------------------
+ * 函式：轉義單引號
+ * 版本：v1.0（2026-09-16）
+ * 用途：場次代碼會被組進 onclick="...('代碼')" 這種內嵌 JS 字串裡，
+ *       只需要處理單引號避免破壞語法即可（HTML 特殊字元由
+ *       轉義HTML 另外處理，這裡職責單純只管單引號逸出）。
+ * 參數：
+ *   str原始文字 - 任意字串
+ * 回傳：str 已跳脫單引號的字串
+ * ------------------------------------------------------------
+ */
+function 轉義單引號(str原始文字) {
+  return String(str原始文字).replace(/'/g, "\\'");
+}
+
+/**
+ * ------------------------------------------------------------
+ * 函式：載入場次清單
+ * 版本：v1.0（2026-09-16）
+ * 用途：呼叫「查詢場次清單」API，把結果渲染到畫面上的表格區塊。
+ * 參數：無
+ * 回傳：無
+ * ------------------------------------------------------------
+ */
+async function 載入場次清單() {
+  const obj登入資訊 = 取得目前登入精舍資訊();
+  if (!obj登入資訊) { return; }
+
+  const elArea = document.getElementById("sessionListArea");
+
+  try {
+    const objResult = await 呼叫後端API({
+      system: "報到",
+      action: "查詢場次清單",
+      token: obj登入資訊.token
+    });
+
+    if (objResult.成功) {
+      elArea.innerHTML = 組出場次清單表格HTML(objResult.場次清單);
+    } else {
+      elArea.innerHTML = "<div class='empty-hint'>載入失敗：" + 轉義HTML(objResult.訊息 || "未知錯誤") + "</div>";
+    }
+  } catch (錯誤) {
+    console.error("載入場次清單時發生錯誤：", 錯誤);
+    elArea.innerHTML = "<div class='empty-hint'>載入時發生未預期錯誤，請重新整理頁面再試一次。</div>";
+  }
+}
+
+/**
+ * ------------------------------------------------------------
+ * 函式：初始化頁面
+ * 版本：v1.0（2026-09-16）
+ * 用途：頁面載入時執行，檢查登入狀態，沒登入就導回登入頁面；
+ *       已登入則顯示精舍名稱，並載入場次清單。
+ * 參數：無
+ * 回傳：無
+ * ------------------------------------------------------------
+ */
+async function 初始化頁面() {
+  const obj登入資訊 = 取得目前登入精舍資訊();
+
+  if (!obj登入資訊) {
+    window.location.href = "login.html";
+    return;
+  }
+
+  document.getElementById("templeNameShow").textContent = "（" + obj登入資訊.精舍顯示名稱 + "）";
+  document.getElementById("loadingNotice").style.display = "none";
+  document.getElementById("mainContent").style.display = "block";
+
+  await 載入場次清單();
+}
+
+初始化頁面();
+
+</script>
+
+</body>
+</html>
