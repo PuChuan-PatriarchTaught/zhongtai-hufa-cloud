@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>護法會頸證出席報到系統</title>
+<style>
+  :root {
+    --color-bg: #F5F1E6;
+    --color-card-bg: #FFFFFF;
+    --color-card-border: #E4DCC8;
+    --color-title: #2E2418;
+    --color-subtitle: #8A7B63;
+    --color-accent: #6B4226;
+    --color-accent-hover: #533019;
+    --color-accent-disabled: #C9B9A3;
+    --color-danger: #B3372C;
+    --color-confirm-card-bg: #EEF3E7;
+    --color-confirm-card-border: #C7D6B8;
+    --color-confirm-profile-bg: #F7FAF3;
+  }
+  body {
+    font-family: "微軟正黑體", "PMingLiU", sans-serif;
+    background: var(--color-bg);
+    color: var(--color-title);
+    margin: 0;
+    padding: 24px 16px 60px 16px;
+  }
+  .wrap {
+    max-width: 480px;
+    margin: 0 auto;
+  }
+  .header-card {
+    padding: 4px 4px 18px 4px;
+    margin-bottom: 18px;
+    border-bottom: 1px solid var(--color-card-border);
+  }
+  .header-card h1 {
+    font-size: 21px;
+    margin: 0 0 6px 0;
+    color: var(--color-title);
+  }
+  .header-card .session-line {
+    font-size: 14px;
+    color: var(--color-subtitle);
+  }
+  .header-card .announcement {
+    font-size: 13px;
+    color: var(--color-subtitle);
+    line-height: 1.5;
+    margin-top: 4px;
+  }
+  .header-card .status-ended {
+    margin-top: 8px;
+    background: var(--color-danger);
+    color: #fff;
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+  }
+
+  .card {
+    background: var(--color-card-bg);
+    border: 1px solid var(--color-card-border);
+    border-radius: 10px;
+    padding: 22px 20px;
+    margin-bottom: 18px;
+  }
+  #cardResult.card {
+    background: var(--color-confirm-card-bg);
+    border-color: var(--color-confirm-card-border);
+  }
+
+  .candidate-list { margin-top: 6px; }
+  .candidate-item {
+    width: 100%;
+    display: block;
+    text-align: left;
+    background: var(--color-confirm-profile-bg);
+    border: 1px solid var(--color-confirm-card-border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-top: 10px;
+    font-size: 20px;
+    color: var(--color-title);
+    cursor: pointer;
+  }
+  .candidate-item:hover:not(:disabled) { background: #FFFFFF; }
+  .candidate-item:disabled { color: var(--color-subtitle); cursor: not-allowed; }
+
+  label {
+    display: block;
+    font-weight: bold;
+    font-size: 13px;
+    margin-bottom: 8px;
+    color: var(--color-title);
+  }
+  input[type=text] {
+    width: 100%;
+    padding: 14px 12px;
+    box-sizing: border-box;
+    border: 1px solid var(--color-card-border);
+    border-radius: 8px;
+    font-size: 18px;
+    text-align: center;
+    letter-spacing: 1px;
+    background: #FBF9F4;
+    color: var(--color-title);
+  }
+  input[type=text]:disabled { background: #EFEBE1; color: var(--color-subtitle); }
+
+  button.big-action {
+    width: 100%;
+    margin-top: 14px;
+    padding: 14px;
+    background: var(--color-accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    cursor: pointer;
+  }
+  button.big-action:disabled { background: var(--color-accent-disabled); cursor: not-allowed; }
+  button.big-action:hover:not(:disabled) { background: var(--color-accent-hover); }
+
+  .msg { margin-top: 14px; font-size: 20px; line-height: 1.5; text-align: center; min-height: 18px; white-space: pre-line; }
+  .msg:first-child { margin-top: 0; }
+  .msg.error { color: var(--color-danger); }
+  .msg.success { color: #3F6B2E; font-weight: bold; }
+  .msg.info { color: var(--color-subtitle); }
+
+  #loadingNotice {
+    text-align: center;
+    color: var(--color-subtitle);
+    padding: 40px 0;
+  }
+</style>
+</head>
+<body>
+
+<div id="loadingNotice">載入中，請稍候...</div>
+
+<div class="wrap" id="mainContent" style="display:none;">
+
+  <div class="header-card">
+    <h1>護法會頸證出席報到系統</h1>
+    <div class="session-line">目前報到場次：<span id="sessionNameShow"></span></div>
+    <div class="announcement" id="announcementShow"></div>
+    <div id="endedBadge" style="display:none;" class="status-ended">本場次報到已結束</div>
+  </div>
+
+  <div class="card" id="cardResult" style="display:none;">
+    <div class="msg" id="msgResult"></div>
+    <div class="candidate-list" id="candidateList"></div>
+  </div>
+
+  <div class="card" id="cardSearch">
+    <label for="inputStudentId">請輸入學員編號或姓名</label>
+    <input type="text" id="inputStudentId" autocomplete="off" inputmode="text" placeholder="輸入後按 Enter 或查詢報到">
+    <button class="big-action" id="btnSearch" onclick="處理查詢按鈕點擊()">查詢報到</button>
+  </div>
+
+</div>
+
+<script src="config.js"></script>
+<script>
+
+
+function 取得網址參數(strKey) {
+  const params = new URLSearchParams(window.location.search);
+  return params.get(strKey) || "";
+}
+
+function 顯示區塊訊息(strMsgElementId, str訊息內容, str樣式) {
+  const elMsg = document.getElementById(strMsgElementId);
+  elMsg.textContent = str訊息內容;
+  elMsg.className = "msg " + str樣式;
+}
+
+function 組合含注意事項訊息(str原始訊息, str注意事項) {
+  if (str注意事項) {
+    return str原始訊息 + "\n【注意事項】" + str注意事項;
+  }
+  return str原始訊息;
+}
+
+function 清空候選清單() {
+  document.getElementById("candidateList").innerHTML = "";
+}
+
+function 顯示候選清單(arr候選清單) {
+  const elList = document.getElementById("candidateList");
+  elList.innerHTML = "";
+
+  arr候選清單.forEach(function (obj候選) {
+    const elButton = document.createElement("button");
+    elButton.type = "button";
+    elButton.className = "candidate-item";
+    elButton.textContent = obj候選.姓名 + (obj候選.法名 ? "（" + obj候選.法名 + "）" : "");
+    elButton.onclick = function () {
+      Array.prototype.forEach.call(elList.querySelectorAll(".candidate-item"), function (el) {
+        el.disabled = true;
+      });
+      送出報到(String(obj候選.學員編號));
+    };
+    elList.appendChild(elButton);
+  });
+}
+
+async function 送出報到(str輸入內容) {
+  document.getElementById("cardResult").style.display = "block";
+  清空候選清單();
+
+  const btn查詢按鈕 = document.getElementById("btnSearch");
+  btn查詢按鈕.disabled = true;
+  顯示區塊訊息("msgResult", "處理中，請稍候...", "info");
+
+  try {
+    const objResult = await 呼叫後端API({
+      system: "現場報到",
+      action: "確認報到",
+      精舍代碼: 取得網址參數("temple"),
+      場次代碼: 取得網址參數("session"),
+      學員編號: str輸入內容
+    });
+
+    if (objResult.成功) {
+      var str基本訊息 = "✓ " + (objResult.訊息 || "報到成功！");
+      var str姓名資訊 = objResult.姓名
+        ? objResult.姓名 + (objResult.法名 ? "（" + objResult.法名 + "）" : "")
+        : "";
+      var str含姓名訊息 = str姓名資訊 ? str基本訊息 + "\n" + str姓名資訊 : str基本訊息;
+
+      顯示區塊訊息(
+        "msgResult",
+        組合含注意事項訊息(str含姓名訊息, objResult.注意事項),
+        "success"
+      );
+      document.getElementById("inputStudentId").value = "";
+      document.getElementById("inputStudentId").focus();
+      return;
+    }
+
+    if (objResult.類型 === "同名同姓待選") {
+      顯示區塊訊息("msgResult", objResult.訊息, "info");
+      顯示候選清單(objResult.候選清單 || []);
+      return;
+    }
+
+    顯示區塊訊息(
+      "msgResult",
+      組合含注意事項訊息(objResult.訊息 || "報到失敗，請洽現場工作人員協助。", objResult.注意事項),
+      "error"
+    );
+  } catch (錯誤) {
+    console.error("送出報到時發生未預期錯誤：", 錯誤);
+    顯示區塊訊息("msgResult", "系統發生未預期錯誤，請稍後再試或洽現場工作人員協助。", "error");
+  } finally {
+    btn查詢按鈕.disabled = false;
+  }
+}
+
+function 處理查詢按鈕點擊() {
+  const str輸入內容 = document.getElementById("inputStudentId").value.trim();
+
+  if (!str輸入內容) {
+    document.getElementById("cardResult").style.display = "block";
+    清空候選清單();
+    顯示區塊訊息("msgResult", "請輸入學員編號或姓名。", "error");
+    return;
+  }
+
+  送出報到(str輸入內容);
+}
+
+async function 初始化頁面() {
+  const str精舍代碼 = 取得網址參數("temple");
+  const str場次代碼 = 取得網址參數("session");
+
+  if (!str精舍代碼 || !str場次代碼) {
+    document.getElementById("loadingNotice").textContent =
+      "網址參數不完整，請確認報到頁連結是否正確（應包含 ?temple=...&session=...），或洽現場工作人員協助。";
+    return;
+  }
+
+  try {
+    const objResult = await 呼叫後端API({
+      system: "現場報到",
+      action: "查詢場次公開資訊",
+      精舍代碼: str精舍代碼,
+      場次代碼: str場次代碼
+    });
+
+    if (!objResult.成功) {
+      document.getElementById("loadingNotice").textContent =
+        objResult.訊息 || "無法載入場次資訊，請洽現場工作人員協助。";
+      return;
+    }
+
+    document.getElementById("sessionNameShow").textContent = objResult.場次名稱;
+    document.getElementById("announcementShow").textContent = objResult.公告文字 || "";
+
+    document.getElementById("loadingNotice").style.display = "none";
+    document.getElementById("mainContent").style.display = "block";
+
+    if (objResult.狀態 !== "進行中") {
+      document.getElementById("endedBadge").style.display = "inline-block";
+      document.getElementById("inputStudentId").disabled = true;
+      document.getElementById("btnSearch").disabled = true;
+    } else {
+      document.getElementById("inputStudentId").focus();
+      document.getElementById("inputStudentId").addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          if (!document.getElementById("btnSearch").disabled) {
+            處理查詢按鈕點擊();
+          }
+        }
+      });
+    }
+  } catch (錯誤) {
+    console.error("載入場次公開資訊時發生錯誤：", 錯誤);
+    document.getElementById("loadingNotice").textContent =
+      "載入時發生未預期錯誤，請重新整理頁面再試一次，或洽現場工作人員協助。";
+  }
+}
+
+初始化頁面();
+
+</script>
+
+</body>
+</html>
