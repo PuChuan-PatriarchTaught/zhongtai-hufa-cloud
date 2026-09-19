@@ -5,6 +5,29 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>護法會雲端系統 - 提報名單資料組操作</title>
 <style>
+  /*
+   * ============================================================
+   * 檔案：提報系統資料組核心操作頁面
+   * 版本：v1.1（2026-09-19）
+   * 版本歷程：
+   *   - v1.1（2026-09-19，法師建議）：按鈕前的圈圈數字改成「每張卡片
+   *     各自重新從①開始編號」，而不是整頁從①一路編到⑥。原本編號是
+   *     跨卡片連續（卡片一①②、卡片二③④、卡片三⑤、卡片四⑥），
+   *     容易讓人誤以為要照①②③④⑤⑥的順序跨卡片操作；改成每張卡片
+   *     內部各自①②，比較容易看出「這是同一個作業區塊內的步驟」。
+   * 說明：
+   *   精舍登入後（沿用「精舍後台管理」同一套登入狀態）的提報系統
+   *   資料組操作頁面，依作業順序分成四張卡片：
+   *     一、匯入作業（建立匯入來源分頁／匯入提報名單）
+   *     二、學員編號比對（比對學員編號／姓名反查學員編號／
+   *         候選清單核對回填）
+   *     三、超額標色與法師會議決議（彙總職務數與超額標色／
+   *         待複核清單逐筆勾選保留或取消）
+   *     四、核定名單（套用決議並產出核定名單／檢視核定名單）
+   *   對應舊版 Module2／Module3／Module4 選單⑥～⑪，核心業務邏輯
+   *   完全沿用，只是把「選單點擊＋跳出對話框」改成網頁操作。
+   * ============================================================
+   */
   body {
     font-family: "微軟正黑體", "PMingLiU", sans-serif;
     background: #f4f6f9;
@@ -146,9 +169,10 @@
     </div>
   </div>
 
+  <!-- 卡片一：匯入作業 -->
   <div class="card">
     <h2>一、匯入作業</h2>
-    <div class="desc">先執行「建立匯入來源分頁」，若偵測到上一期封桓產生的下一期起始名單會自動沿用，否則會建立一份空白「匯入來源」分頁，請把 Excel「提報名單」的資料貼進主資料庫試算表的「匯入來源」分頁後，再回來執行「匯入提報名單」（會依組別自動拆分寫入各組分頁）。</div>
+    <div class="desc">先執行「建立匯入來源分頁」，若偵測到上一期封存產生的下一期起始名單會自動沿用，否則會建立一份空白「匯入來源」分頁，請把 Excel「提報名單」的資料貼進主資料庫試算表的「匯入來源」分頁後，再回來執行「匯入提報名單」（會依組別自動拆分寫入各組分頁）。</div>
     <div class="step-row">
       <button class="action" id="btnCreateImportSheet" onclick="處理建立匯入來源分頁按鈕點擊()">① 建立匯入來源分頁</button>
       <button class="action" id="btnImportReportList" onclick="處理匯入提報名單按鈕點擊()">② 匯入提報名單</button>
@@ -156,12 +180,13 @@
     <div class="msg" id="msgImport"></div>
   </div>
 
+  <!-- 卡片二：學員編號比對 -->
   <div class="card">
     <h2>二、學員編號比對</h2>
     <div class="desc">「比對學員編號」會用學員基本資料補齊姓名／法名／性別，查無資料的列會標黃提醒。「姓名反查學員編號」用於組長只填姓名、沒填學員編號的情況，唯一命中會自動補回，同名多筆或查無資料會列在下方候選清單，請核對後在候選學員編號欄位確認並回填。</div>
     <div class="step-row">
-      <button class="action" id="btnMatchStudentId" onclick="處理比對學員編號按鈕點擊()">③ 比對學員編號</button>
-      <button class="action" id="btnReverseLookup" onclick="處理姓名反查學員編號按鈕點擊()">④ 姓名反查學員編號</button>
+      <button class="action" id="btnMatchStudentId" onclick="處理比對學員編號按鈕點擊()">① 比對學員編號</button>
+      <button class="action" id="btnReverseLookup" onclick="處理姓名反查學員編號按鈕點擊()">② 姓名反查學員編號</button>
       <button class="action secondary" id="btnRefreshCandidateList" onclick="載入候選清單()">重新整理候選清單</button>
     </div>
     <div class="msg" id="msgMatch"></div>
@@ -172,11 +197,12 @@
     <div class="msg" id="msgCandidateList"></div>
   </div>
 
+  <!-- 卡片三：超額標色與法師會議決議 -->
   <div class="card">
     <h2>三、超額標色與法師會議決議</h2>
-    <div class="desc">「彙總職務數與超額標色」會依學員編號彙總全體職務數，超過門櫃（3張聘書）的人整列標紅，並列在下方「待複核清單」，請法師會議逐筆針對「這一筆職務」勾選保留或取消（取消要填原因），選好後按「送出決議」一次送出。</div>
+    <div class="desc">「彙總職務數與超額標色」會依學員編號彙總全體職務數，超過門檻（3張聘書）的人整列標紅，並列在下方「待複核清單」，請法師會議逐筆針對「這一筆職務」勾選保留或取消（取消要填原因），選好後按「送出決議」一次送出。</div>
     <div class="step-row">
-      <button class="action" id="btnSummarizeOverLimit" onclick="處理彙總職務數與超額標色按鈕點擊()">⑤ 彙總職務數與超額標色</button>
+      <button class="action" id="btnSummarizeOverLimit" onclick="處理彙總職務數與超額標色按鈕點擊()">① 彙總職務數與超額標色</button>
       <button class="action secondary" id="btnRefreshReviewList" onclick="載入待複核清單()">重新整理待複核清單</button>
     </div>
     <div class="msg" id="msgSummarize"></div>
@@ -190,11 +216,12 @@
     <div class="msg" id="msgReviewList"></div>
   </div>
 
+  <!-- 卡片四：核定名單 -->
   <div class="card">
     <h2>四、核定名單</h2>
     <div class="desc">確認「待複核清單」所有超額項目都已決議完畢後，執行「套用決議並產出核定名單」，系統會彙整所有有效聘任的職務、扣除決議取消的部分，產出核定名單（同步刷新原始版快照）。若還有未決議項目會提醒，不會產出。</div>
     <div class="step-row">
-      <button class="action" id="btnGenerateApprovedList" onclick="處理套用決議並產出核定名單按鈕點擊()">⑥ 套用決議並產出核定名單</button>
+      <button class="action" id="btnGenerateApprovedList" onclick="處理套用決議並產出核定名單按鈕點擊()">① 套用決議並產出核定名單</button>
       <button class="action secondary" id="btnRefreshApprovedList" onclick="載入核定名單()">重新整理核定名單</button>
     </div>
     <div class="msg" id="msgApprovedList"></div>
@@ -209,12 +236,27 @@
 <script src="config.js"></script>
 <script>
 
+/**
+ * ------------------------------------------------------------
+ * 函式：顯示區塊訊息
+ * 版本：v1.0（2026-09-18）
+ * 用途：在指定的訊息區塊顯示提示、成功或錯誤訊息。
+ * ------------------------------------------------------------
+ */
 function 顯示區塊訊息(strMsgElementId, str訊息內容, str樣式) {
   const elMsg = document.getElementById(strMsgElementId);
   elMsg.textContent = str訊息內容;
   elMsg.className = "msg " + str樣式;
 }
 
+/**
+ * ------------------------------------------------------------
+ * 函式：轉義HTML
+ * 版本：v1.0（2026-09-18）
+ * 用途：把資料中可能含有 < > 等符號的內容轉成安全的 HTML 顯示
+ *       文字，避免破壞畫面排版（基本的 XSS 防護）。
+ * ------------------------------------------------------------
+ */
 function 轉義HTML(str原始文字) {
   if (str原始文字 === undefined || str原始文字 === null) return "";
   const div = document.createElement("div");
@@ -222,15 +264,42 @@ function 轉義HTML(str原始文字) {
   return div.innerHTML;
 }
 
+/**
+ * ------------------------------------------------------------
+ * 函式：轉義單引號
+ * 版本：v1.0（2026-09-18）
+ * 用途：資料值會被組進 onclick="...('值')" 這種內嵌 JS 字串裡，
+ *       這裡處理單引號避免破壞語法（HTML 特殊字元由 轉義HTML 另外處理）。
+ * ------------------------------------------------------------
+ */
 function 轉義單引號(str原始文字) {
   return String(str原始文字).replace(/'/g, "\\'");
 }
 
+/**
+ * ------------------------------------------------------------
+ * 函式：處理登出按鈕點擊
+ * 版本：v1.0（2026-09-18）
+ * ------------------------------------------------------------
+ */
 function 處理登出按鈕點擊() {
   清除登入精舍資訊();
   window.location.href = "login.html";
 }
 
+/**
+ * ------------------------------------------------------------
+ * 函式：呼叫提報API
+ * 版本：v1.0（2026-09-18）
+ * 用途：統一組裝 system:"提報" 的請求物件並附上目前登入 token，
+ *       避免每個操作函式都重複寫一樣的樣板程式碼。登入狀態失效
+ *       時直接導回登入頁，不需要呼叫端各自處理。
+ * 參數：
+ *   str動作     - action 名稱（例如 "比對學員編號"）
+ *   obj額外參數 - 該 action 需要的其他參數物件（可省略）
+ * 回傳：Promise，resolve 為後端回傳的物件
+ * ------------------------------------------------------------
+ */
 async function 呼叫提報API(str動作, obj額外參數) {
   const obj登入資訊 = 取得目前登入精舍資訊();
   if (!obj登入資訊) {
@@ -246,6 +315,9 @@ async function 呼叫提報API(str動作, obj額外參數) {
 }
 
 
+// ==================== 【卡片一：匯入作業】 ====================
+
+/** 版本 v1.0：① 建立匯入來源分頁 */
 async function 處理建立匯入來源分頁按鈕點擊() {
   const btn = document.getElementById("btnCreateImportSheet");
   btn.disabled = true;
@@ -261,6 +333,7 @@ async function 處理建立匯入來源分頁按鈕點擊() {
   }
 }
 
+/** 版本 v1.0：② 匯入提報名單 */
 async function 處理匯入提報名單按鈕點擊() {
   const bool確認 = window.confirm(
     "執行匯入前，系統會先清空所有「提報_」開頭分頁中既有的資料列（表頭與下拉選單設定不會被清除），避免新舊資料混雜。確定要繼續嗎？"
@@ -281,6 +354,10 @@ async function 處理匯入提報名單按鈕點擊() {
   }
 }
 
+
+// ==================== 【卡片二：學員編號比對】 ====================
+
+/** 版本 v1.0：① 比對學員編號 */
 async function 處理比對學員編號按鈕點擊() {
   const btn = document.getElementById("btnMatchStudentId");
   btn.disabled = true;
@@ -296,6 +373,7 @@ async function 處理比對學員編號按鈕點擊() {
   }
 }
 
+/** 版本 v1.0：② 姓名反查學員編號 */
 async function 處理姓名反查學員編號按鈕點擊() {
   const btn = document.getElementById("btnReverseLookup");
   btn.disabled = true;
@@ -314,6 +392,15 @@ async function 處理姓名反查學員編號按鈕點擊() {
   }
 }
 
+/**
+ * ------------------------------------------------------------
+ * 函式：組出候選清單表格HTML
+ * 版本：v1.0（2026-09-18）
+ * 用途：把「姓名反查候選清單」渲染成表格，每一列附上一個輸入框
+ *       ＋「確認回填」按鈕，供資料組核對後直接把正確學員編號
+ *       回填到來源分頁，取代舊版「手動回到提報分頁填學員編號」。
+ * ------------------------------------------------------------
+ */
 function 組出候選清單表格HTML(arr候選清單) {
   if (!arr候選清單 || arr候選清單.length === 0) {
     return "<div class='empty-hint'>目前沒有需要人工核對的候選項目。</div>";
@@ -343,6 +430,7 @@ function 組出候選清單表格HTML(arr候選清單) {
   return strHTML;
 }
 
+/** 版本 v1.0：載入候選清單 */
 async function 載入候選清單() {
   const elArea = document.getElementById("candidateListArea");
   try {
@@ -358,6 +446,7 @@ async function 載入候選清單() {
   }
 }
 
+/** 版本 v1.0：資料組核對候選清單某一筆後，確認回填學員編號 */
 async function 處理回填候選學員編號按鈕點擊(str來源分頁, int來源列號, strInputId) {
   const str學員編號 = document.getElementById(strInputId).value.trim();
   if (!str學員編號) {
@@ -379,6 +468,10 @@ async function 處理回填候選學員編號按鈕點擊(str來源分頁, int�
   }
 }
 
+
+// ==================== 【卡片三：超額標色與法師會議決議】 ====================
+
+/** 版本 v1.0：① 彙總職務數與超額標色 */
 async function 處理彙總職務數與超額標色按鈕點擊() {
   const btn = document.getElementById("btnSummarizeOverLimit");
   btn.disabled = true;
@@ -397,6 +490,16 @@ async function 處理彙總職務數與超額標色按鈕點擊() {
   }
 }
 
+/**
+ * ------------------------------------------------------------
+ * 函式：組出待複核清單表格HTML
+ * 版本：v1.0（2026-09-18）
+ * 用途：把「待複核清單」渲染成表格，每一列（每一筆職務）附上
+ *       「保留／取消」下拉選單與取消原因輸入框，供法師會議逐筆
+ *       決議；「候選項目ID」是本次移植新增的穩定識別碼，藏在
+ *       隱藏欄位裡（畫面上不需要法師看到，但送出決議時要一併帶回）。
+ * ------------------------------------------------------------
+ */
 function 組出待複核清單表格HTML(arr待複核清單) {
   if (!arr待複核清單 || arr待複核清單.length === 0) {
     return "<div class='empty-hint'>目前沒有超額待複核的項目。</div>";
@@ -433,6 +536,7 @@ function 組出待複核清單表格HTML(arr待複核清單) {
   return strHTML;
 }
 
+/** 版本 v1.0：載入待複核清單 */
 async function 載入待複核清單() {
   const elArea = document.getElementById("reviewListArea");
   try {
@@ -448,6 +552,15 @@ async function 載入待複核清單() {
   }
 }
 
+/**
+ * ------------------------------------------------------------
+ * 函式：處理送出決議按鈕點擊
+ * 版本：v1.0（2026-09-18）
+ * 用途：掃描目前畫面上「待複核清單」表格的每一列，把已選擇
+ *       （非「尚未決議」）的項目組成決議清單，呼叫「登錄決議」
+ *       API 一次送出，成功後重新載入清單，讓畫面反映最新狀態。
+ * ------------------------------------------------------------
+ */
 async function 處理送出決議按鈕點擊() {
   const arrRows = document.querySelectorAll("#reviewListArea tr[data-candidate-id]");
   if (arrRows.length === 0) {
@@ -494,6 +607,10 @@ async function 處理送出決議按鈕點擊() {
   }
 }
 
+
+// ==================== 【卡片四：核定名單】 ====================
+
+/** 版本 v1.0：① 套用決議並產出核定名單 */
 async function 處理套用決議並產出核定名單按鈕點擊() {
   const btn = document.getElementById("btnGenerateApprovedList");
   btn.disabled = true;
@@ -512,6 +629,12 @@ async function 處理套用決議並產出核定名單按鈕點擊() {
   }
 }
 
+/**
+ * ------------------------------------------------------------
+ * 函式：組出核定名單表格HTML
+ * 版本：v1.0（2026-09-18）
+ * ------------------------------------------------------------
+ */
 function 組出核定名單表格HTML(arr核定名單) {
   if (!arr核定名單 || arr核定名單.length === 0) {
     return "<div class='empty-hint'>目前尚未產出核定名單。</div>";
@@ -536,6 +659,7 @@ function 組出核定名單表格HTML(arr核定名單) {
   return strHTML;
 }
 
+/** 版本 v1.0：載入核定名單 */
 async function 載入核定名單() {
   const elArea = document.getElementById("approvedListArea");
   try {
@@ -551,6 +675,18 @@ async function 載入核定名單() {
   }
 }
 
+
+// ==================== 【頁面初始化】 ====================
+
+/**
+ * ------------------------------------------------------------
+ * 函式：初始化頁面
+ * 版本：v1.0（2026-09-18）
+ * 用途：頁面載入時執行，檢查登入狀態，沒登入就導回登入頁面；
+ *       已登入則顯示精舍名稱，並載入候選清單／待複核清單／核定
+ *       名單三個區塊的目前狀態。
+ * ------------------------------------------------------------
+ */
 async function 初始化頁面() {
   const obj登入資訊 = 取得目前登入精舍資訊();
 
