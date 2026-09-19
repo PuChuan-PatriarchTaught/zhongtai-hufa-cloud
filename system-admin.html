@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>護法會雲端系統 - 系統管理後台</title>
+<style>
+  /*
+   * ============================================================
+   * 檔案：系統管理後台頁面（總管理員專用）
+   * 版本：v1.0（2026-09-19）
+   * 說明：
+   *   總管理員（法師／中台統一管理帳號）專用的後台頁面，網址不對外
+   *   公開連結、也不出現在精舍登入頁面（login.html）上，僅供知道
+   *   網址的總管理員使用，登入方式為獨立的「管理者密碼」（system
+   *   管理_02_驗證與Session.gs 的 管理者登入 API）。
+   *
+   *   提供 4 項功能：
+   *   1. 新增精舍（精舍代碼＋Email選填）
+   *   2. 精舍清單（檢視所有精舍設定，含密碼救援用途）
+   *   3. 修改精舍設定（救援用：可修改任一精舍的顯示名稱／密碼／
+   *      Email／6 種試算表 ID）
+   *   4. 異動記錄查詢（可篩選特定精舍或查全部）
+   *
+   *   進入本頁前會先檢查 sessionStorage 是否有管理者登入資訊，
+   *   沒有就顯示登入表單（不像精舍登入會導向另一個頁面，因為
+   *   系統管理後台是單一頁面，登入表單與功能區塊在同一支檔案內
+   *   依登入狀態切換顯示）。
+   * ============================================================
+   */
+  body {
+    font-family: "微軟正黑體", "PMingLiU", sans-serif;
+    background: #f4f6f9;
+    color: #222;
+    margin: 0;
+    padding: 24px 16px 60px 16px;
+  }
+  .wrap {
+    max-width: 860px;
+    margin: 0 auto;
+  }
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+  .topbar h1 {
+    font-size: 19px;
+    color: #1F3864;
+    margin: 0;
+  }
+  #btnLogout {
+    background: #888;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 14px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  #btnLogout:hover { background: #555; }
+
+  .card {
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    padding: 20px 24px;
+    margin-bottom: 22px;
+  }
+  .card h2 {
+    font-size: 16px;
+    color: #2E5395;
+    margin: 0 0 4px 0;
+    border-bottom: 1px solid #e5e5e5;
+    padding-bottom: 8px;
+  }
+  .card .desc {
+    color: #777;
+    font-size: 12.5px;
+    margin: 8px 0 16px 0;
+  }
+  label {
+    display: block;
+    font-weight: bold;
+    font-size: 13.5px;
+    margin: 12px 0 6px 0;
+  }
+  input[type=text], input[type=password], select {
+    width: 100%;
+    padding: 8px 10px;
+    box-sizing: border-box;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+  button.action {
+    margin-top: 18px;
+    padding: 9px 18px;
+    background: #2E5395;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  button.action:disabled {
+    background: #99a8c2;
+    cursor: not-allowed;
+  }
+  button.action:hover:not(:disabled) { background: #1F3864; }
+
+  button.small {
+    padding: 4px 10px;
+    background: #6c8ebf;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  button.small:hover { background: #4a6ea8; }
+
+  .msg { margin-top: 12px; font-size: 13px; min-height: 18px; }
+  .msg.error { color: #c00; }
+  .msg.success { color: #1a7f37; }
+  .msg.info { color: #666; }
+
+  table.list {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin-top: 8px;
+  }
+  table.list th, table.list td {
+    border: 1px solid #ddd;
+    padding: 6px 8px;
+    text-align: left;
+    vertical-align: top;
+  }
+  table.list th {
+    background: #eef2f9;
+    color: #1F3864;
+  }
+  table.list td.mono {
+    font-family: monospace;
+    font-size: 12px;
+  }
+
+  #loadingNotice {
+    text-align: center;
+    color: #666;
+    padding: 40px 0;
+  }
+
+  .login-box {
+    max-width: 360px;
+    margin: 80px auto;
+  }
+</style>
+</head>
+<body>
+
+<div id="loadingNotice">載入中，請稍候...</div>
+
+<!-- 登入畫面：尚未登入管理者時顯示 -->
+<div class="wrap login-box" id="loginBox" style="display:none;">
+  <div class="card">
+    <h2>系統管理後台登入</h2>
+    <div class="desc">本頁僅供總管理員（法師／中台統一管理帳號）使用，請輸入管理者密碼。</div>
+    <label for="inputAdminPassword">管理者密碼</label>
+    <input type="password" id="inputAdminPassword" autocomplete="off">
+    <button class="action" id="btnAdminLogin" onclick="處理管理者登入按鈕點擊()">① 登入</button>
+    <div class="msg" id="msgAdminLogin"></div>
+  </div>
+</div>
+
+<!-- 主內容：登入成功後顯示 -->
+<div class="wrap" id="mainContent" style="display:none;">
+
+  <div class="topbar">
+    <h1>系統管理後台</h1>
+    <button id="btnLogout" onclick="處理登出按鈕點擊()">登出</button>
+  </div>
+
+  <!-- 卡片一：新增精舍 -->
+  <div class="card">
+    <h2>新增精舍</h2>
+    <div class="desc">
+      只需輸入精舍代碼，系統會自動給予統一預設密碼「1234」，6 種試算表 ID 留空由精舍自行登入設定。
+      Email 為選填欄位，用於登記精舍聯絡人／接手人身份，僅作記錄用途，不影響精舍登入方式（精舍登入仍為精舍代碼＋密碼）。
+    </div>
+
+    <label for="inputNewTempleCode">精舍代碼</label>
+    <input type="text" id="inputNewTempleCode" autocomplete="off" placeholder="例如：A、B、putong">
+
+    <label for="inputNewTempleEmail">精舍 Email（選填）</label>
+    <input type="text" id="inputNewTempleEmail" autocomplete="off" placeholder="例如：temple-a@gmail.com">
+
+    <button class="action" id="btnAddTemple" onclick="處理新增精舍按鈕點擊()">① 新增精舍</button>
+    <div class="msg" id="msgAddTemple"></div>
+  </div>
+
+  <!-- 卡片二：精舍清單 -->
+  <div class="card">
+    <h2>精舍清單</h2>
+    <div class="desc">
+      顯示目前所有精舍的設定狀態。密碼欄位預設隱藏，點擊「顯示」才會顯示明碼，救援時使用，請留意畫面共用時的隱私。
+    </div>
+
+    <button class="action" id="btnRefreshList" onclick="載入精舍清單()">① 重新整理清單</button>
+    <div class="msg" id="msgTempleList"></div>
+
+    <table class="list" id="tableTempleList" style="display:none;">
+      <thead>
+        <tr>
+          <th>精舍代碼</th>
+          <th>顯示名稱</th>
+          <th>密碼</th>
+          <th>Email</th>
+          <th>試算表設定</th>
+          <th>建立時間</th>
+          <th>最後修改時間</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="tbodyTempleList"></tbody>
+    </table>
+  </div>
+
+  <!-- 卡片三：修改精舍設定 -->
+  <div class="card">
+    <h2>修改精舍設定（救援用）</h2>
+    <div class="desc">
+      選擇精舍代碼後按「載入」，會帶出目前設定；留空的欄位在儲存時不會覆蓋原本的值。
+      此功能供精舍忘記密碼、試算表 ID 設定錯誤等狀況時，由總管理員協助修正。
+    </div>
+
+    <label for="selectEditTemple">選擇精舍代碼</label>
+    <select id="selectEditTemple">
+      <option value="">請先重新整理精舍清單...</option>
+    </select>
+
+    <button class="action" id="btnLoadTempleDetail" onclick="處理載入精舍資料按鈕點擊()">① 載入精舍資料</button>
+
+    <div id="editTempleFields" style="display:none;">
+      <label for="inputEditDisplayName">顯示名稱</label>
+      <input type="text" id="inputEditDisplayName" autocomplete="off">
+
+      <label for="inputEditPassword">密碼（留空表示不修改）</label>
+      <input type="text" id="inputEditPassword" autocomplete="off">
+
+      <label for="inputEditEmail">精舍 Email（留空表示不修改）</label>
+      <input type="text" id="inputEditEmail" autocomplete="off">
+
+      <label for="inputEdit資料庫試算表ID">資料庫試算表ID</label>
+      <input type="text" id="inputEdit資料庫試算表ID" autocomplete="off">
+
+      <label for="inputEdit名單回報試算表ID">名單回報試算表ID</label>
+      <input type="text" id="inputEdit名單回報試算表ID" autocomplete="off">
+
+      <label for="inputEdit出席回報試算表ID">出席回報試算表ID</label>
+      <input type="text" id="inputEdit出席回報試算表ID" autocomplete="off">
+
+      <label for="inputEdit報到名單試算表ID">報到名單試算表ID</label>
+      <input type="text" id="inputEdit報到名單試算表ID" autocomplete="off">
+
+      <label for="inputEdit封存備查試算表ID">封存備查試算表ID</label>
+      <input type="text" id="inputEdit封存備查試算表ID" autocomplete="off">
+
+      <label for="inputEdit學員基本資料試算表ID">學員基本資料試算表ID</label>
+      <input type="text" id="inputEdit學員基本資料試算表ID" autocomplete="off">
+
+      <button class="action" id="btnSaveTempleDetail" onclick="處理儲存精舍修改按鈕點擊()">② 儲存修改</button>
+    </div>
+    <div class="msg" id="msgEditTemple"></div>
+  </div>
+
+  <!-- 卡片四：異動記錄查詢 -->
+  <div class="card">
+    <h2>異動記錄查詢</h2>
+    <div class="desc">最多保留最近 100 筆異動記錄，可篩選特定精舍，或選「全部精舍」查看所有記錄。</div>
+
+    <label for="selectLogTempleFilter">篩選精舍</label>
+    <select id="selectLogTempleFilter">
+      <option value="">全部精舍</option>
+    </select>
+
+    <button class="action" id="btnQueryLog" onclick="處理查詢異動記錄按鈕點擊()">① 查詢異動記錄</button>
+    <div class="msg" id="msgChangeLog"></div>
+
+    <table class="list" id="tableChangeLog" style="display:none;">
+      <thead>
+        <tr>
+          <th>時間</th>
+          <th>精舍代碼</th>
+          <th>操作來源</th>
+          <th>異動摘要</th>
+        </tr>
+      </thead>
+      <tbody id="tbodyChangeLog"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<script src="config.js"></script>
+<script>
+
+// 6 種試算表欄位名稱，集中放在這裡，避免畫面各處分散寫死字串造成打錯字風險
+// （欄位名稱需與後端 系統管理_01_資料存取.gs 的 ARR_試算表欄位清單 完全一致）
+const ARR_試算表欄位名稱 = [
+  "資料庫試算表ID",
+  "名單回報試算表ID",
+  "出席回報試算表ID",
+  "報到名單試算表ID",
+  "封存備查試算表ID",
+  "學員基本資料試算表ID"
+];
+
+// 目前「精舍清單」查詢結果暫存在記憶體中，供「修改精舍設定」卡片
+// 選擇精舍後直接取用，不用每次都重新呼叫後端 API
+let obj目前精舍清單快取 = {};
+
+/**
+ * ------------------------------------------------------------
+ * 函式：顯示區塊訊息
+ * 版本：v1.0（2026-09-19）
+ * 用途：在指定的訊息區塊顯示提示、成功或錯誤訊息。
+ * 參數：
+ *   strMsgElementId - 要顯示訊息的元素 id
+ *   str訊息內容      - 顯示的文字
+ *   str樣式           - "error" / "success" / "info" 三選一
+ * 回傳：無
+ * ------------------------------------------------------------
+ */
+function 顯示區塊訊息(strMsgElementId, str訊息內容, str樣式) {
+  const elMsg = document.getElementById(strMsgElementId);
+  elMsg.textContent = str訊息內容;
+  elMsg.className = "msg " + str樣式;
+}
+
+/**
+ * ------------------------------------------------------------
+ * 函式：轉義HTML
+ * 版本：v1.0（2026-09-19）
+ * 用途：把字串中的 HTML 特殊字元轉義，避免精舍代碼／顯示名稱／
+ *       異動摘要等資料中若剛好含有 < > & 等字元時，被瀏覽器誤判
+ *       為 HTML 標籤，造成畫面跑版或潛在的安全疑慮。
+ * 參數：
+ *   str原始文字 - 要轉義的字串（可能為 undefined 或 null）
+ * 回傳：str轉義後文字
+ * ------------------------------------------------------------
+ */
+function 轉義HTML(str原始文字) {
+  if (str原始文字 === undefined || str原始文字 === null) { return ""; }
+  const elDiv = document.createElement("div");
+  elDiv.textContent = String(str原始文字);
+  return elDiv.innerHTML;
+}
+
+/**
+ * ------------------------------------------------------------
+ * 函式：處理登出按鈕點擊
+ * 版本：v1.0（2026-09-19）
+ * 用途：清除管理者登入資訊，畫面切回登入表單。
+ * 參數：無
+ * 回傳：無
+ * ------------------------------------------------------------
+ */
+function 處理登出按鈕點擊() {
+  清除登入管理者資訊();
+  document.getElementById("mainContent").style.display = "none";
+  document.getElementById("loginBox").style.display = "block";
+  document.getElementById("inputAdminPassword").value = "";
+}
+
+/**
+ * ------------------------------------------------------------
+ * 函式：處理管理者登入按鈕點擊
+ * 版本：v1.0（2026-09-19）
+ * 用途：呼叫「管理者登入」API，成功後把 token 存入
+ *       sessionStorage 並顯示主內容區塊、載入精舍清單。
+ * 參數：無（直接從畫面欄位讀取）
+ * 回傳：無
+ * ------------------------------------------------------------
+ */
+async function 處理管理者登入按鈕點擊() {
+  const str密碼 = document.getElementById("inputAdminPassword").value;
+  const btn登入按鈕 = document.getElementById("btnAdminLogin");
+
+  if (!str密碼) {
+    顯示區塊訊息("msgAdminLogin", "請輸入管理者密碼。", "error");
+    return;
+  }
+
+  btn登入按鈕.disabled = true;
+  顯示區塊訊息("msgAdminLogin", "登入中，請稍候...", "info");
+
+  try {
+    const objResult = await 呼叫後端API({
+      system: "admin",
+      action: "管理者登入",
+      密碼: str密碼
+    });
+
+    if (objResult.成功) {
+      儲存登入管理者資訊(objResult.token);
+      document.getElementById("loginBox").style.display = "none";
+      document.getElementById("mainContent").style.display = "block";
+      await 載入精舍清單();
+    } else {
+      顯示區塊訊息("msgAdminLogin", objResult.訊息 || "登入失敗，請確認密碼是否正確。", "error");
+    }
+  } catch (錯誤) {
+    console.error("管理者登入過程發生未預期錯誤：", 錯誤);
+    顯示區塊訊息("msgAdminLogin", "系統發生未預期錯誤，請稍後再試或聯絡工程人員。", "error");
+  } finally {
+    btn登入按鈕.disabled = false;
+  }
+}
+
+/**
+ * ------------------------------------------------------------
+ * 函式：處理新增精舍按鈕點擊
+ * 版本：v1.0（2026-09-19）
+ * 用途：讀取畫面上的精舍代碼與（選填）Email，呼叫「新增精舍」
+ *       API，成功後清空輸入欄位並重新整理精舍清單，讓畫面
+ *       立即反映最新狀態。
+ * 參數：無（直接從畫面欄位讀取）
+ * 回傳：無
+ * ------------------------------------------------------------
+ */
+async function 處理新增精舍按鈕點擊() {
+  const str精舍代碼 = document.getElementById("inputNewTempleCode").value.trim();
+  const str精舍Email = document.getElementById("inputNewTempleEmail").value.trim();
+  const obj登入資訊 = 取得目前登入管理者資訊();
+
+  if (!obj登入資訊) {
+    顯示區塊訊息("msgAddTemple", "登入狀態已失效，請重新登入。", "error");
+    處理登出按鈕點擊();
+    return;
+  }
+
+  if (!str精舍代碼) {
+    顯示區塊訊息("msgAddTemple", "請輸入精舍代碼。", "error");
+    return;
+  }
+
+  const btn新增按鈕 = document.getElementById("btnAddTemple");
+  btn新增按鈕.disabled = true;
+  顯示區塊訊息("msgAddTemple", "處理中，請稍候...", "info");
+
+  try {
+    const objResult = await 呼叫後端API({
+      system: "admin",
+      action: "新增精舍",
+      token: obj登入資訊.token,
+      精舍代碼: str精舍代碼,
+      精舍Email: str精舍Email
+    });
+
+    if (objResult.成功) {
+      顯示區塊訊息("msgAddTemple", objResult.訊息 || "新增成功。", "success");
+      document.getElementById("inputNewTempleCode").value = "";
+      document.getElementById("inputNewTempleEmail").value = "";
+      await 載入精舍清單();
+    } else {
+      顯示區塊訊息("msgAddTemple", objResult.訊息 || "新增失敗，請確認精舍代碼是否已存在。", "error");
+    }
+  } catch (錯誤) {
+    console.error("新增精舍過程發生未預期錯誤：", 錯誤);
+    顯示區塊訊息("msgAddTemple", "系統發生未預期錯誤，請稍後再試或聯絡工程人員。", "error");
+  } finally {
+    btn新增按鈕.disabled = false;
+  }
+}
+
+/**
+ * ------------------------------------------------------------
+ * 函式：組合試算表設定摘要
+ * 版本：v1.0（2026-09-19）
+ * 用途：計算某精舍 6 種試算表 ID 欄位中，已經填寫的數量，組成
+ *       「已設定 N / 6」的摘要文字，供精舍清單表格簡潔顯示，
+ *       避免表格因為顯示 6 條完整試算表 ID 而過寬難以閱讀。
+ * 參數：
+ *   obj精舍資料 - 單一精舍的設定物件
+ * 回傳：str摘要文字，例如 "已設定 2 / 6"
+ * ------------------------------------------------------------
+ */
+function 組合試算表設定摘要(obj精舍資料) {
+  let int已設定數量 = 0;
+  ARR_試算表欄位名稱.forEach(function (str欄位名稱) {
+    if (obj精舍資料[str欄位名稱]) { int已設定數量 = int已設定數量 + 1; }
+  });
+  return "已設定 " + int已設定數量 + " / " + ARR_試算表欄位名稱.length;
+}
+
+/**
+ * ------------------------------------------------------------
+ * 函式：處理密碼顯示切換按鈕點擊
+ * 版本：v1.0（2026-09-19）
+ * 用途：精舍清單表格中，密碼欄位預設以「••••」遮蔽顯示，點擊
+ *       「顯示」按鈕才切換成明碼，並把按鈕文字改成「隱藏」；
+ *       再點一次可以切回遮蔽狀態。密碼明碼直接存在按鈕的
+ *       data-password 屬性中（畫面產生時就已經寫入，不用重新
+ *       呼叫後端），純粹只是切換畫面顯示與否。
+ * 參數：
+ *   btn按鈕元素 - 被點擊的「顯示／隱藏」按鈕本身
+ * 回傳：無
+ * ------------------------------------------------------------
+ */
+function 處理密碼顯示切換按鈕點擊(btn按鈕元素) {
+  const elPasswordSpan = btn按鈕元素.previousElementSibling;
+  const bool目前是否已顯示 = elPasswordSpan.getAttribute("data-shown") === "1";
+
+  if (bool目前是否已顯示) {
+    elPasswordSpan.textContent = "••••";
+    elPasswordSpan.setAttribute("data-shown", "0");
+    btn按鈕元素.textContent = "顯示";
+  } else {
+    elPasswordSpan.textContent = elPasswordSpan.getAttribute("data-password");
+    elPasswordSpan.setAttribute("data-shown", "1");
+    btn按鈕元素.textContent = "隱藏";
+  }
+}
+
+/**
+ * ------------------------------------------------------------
+ * 函式：載入精舍清單
+ * 版本：v1.0（2026-09-19）
+ * 用途：呼叫「取得精舍清單」API，把結果畫成表格，並同步更新
+ *       「修改精舍設定」與「異動記錄查詢」兩張卡片的精舍下拉
+ *       選單選項，讓三個區塊的資料保持一致。
+ * 參數：無
+ * 回傳：無
+ * ------------------------------------------------------------
+ */
+async function 載入精舍清單() {
+  const obj登入資訊 = 取得目前登入管理者資訊();
+  if (!obj登入資訊) {
+    顯示區塊訊息("msgTempleList", "登入狀態已失效，請重新登入。", "error");
+    處理登出按鈕點擊();
+    return;
+  }
+
+  顯示區塊訊息("msgTempleList", "載入中，請稍候...", "info");
+
+  try {
+    const objResult = await 呼叫後端API({
+      system: "admin",
+      action: "取得精舍清單",
+      token: obj登入資訊.token
+    });
+
+    if (!objResult.成功) {
+      顯示區塊訊息("msgTempleList", objResult.訊息 || "載入精舍清單失敗。", "error");
+      return;
+    }
+
+    obj目前精舍清單快取 = objResult.精舍清單 || {};
+    const arr精舍代碼清單 = Object.keys(obj目前精舍清單快取).sort();
+
+    // 組出表格內容
+    const elTbody = document.getElementById("tbodyTempleList");
+    elTbody.innerHTML = "";
+    arr精舍代碼清單.forEach(function (str精舍代碼) {
+      const obj精舍資料 = obj目前精舍清單快取[str精舍代碼];
+      const elTr = document.createElement("tr");
+      elTr.innerHTML =
+        "<td>" + 轉義HTML(str精舍代碼) + "</td>" +
+        "<td>" + 轉義HTML(obj精舍資料.顯示名稱) + "</td>" +
+        "<td><span data-shown=\"0\" data-password=\"" + 轉義HTML(obj精舍資料.密碼) + "\">••••</span> " +
+          "<button class=\"small\" onclick=\"處理密碼顯示切換按鈕點擊(this)\">顯示</button></td>" +
+        "<td>" + 轉義HTML(obj精舍資料.精舍Email || "（未登記）") + "</td>" +
+        "<td>" + 組合試算表設定摘要(obj精舍資料) + "</td>" +
+        "<td class=\"mono\">" + 轉義HTML(obj精舍資料.建立時間) + "</td>" +
+        "<td class=\"mono\">" + 轉義HTML(obj精舍資料.最後修改時間) + "</td>" +
+        "<td><button class=\"small\" onclick=\"處理清單修改按鈕點擊('" + str精舍代碼.replace(/'/g, "\\'") + "')\">修改</button></td>";
+      elTbody.appendChild(elTr);
+    });
+
+    document.getElementById("tableTempleList").style.display = arr精舍代碼清單.length > 0 ? "table" : "none";
+    顯示區塊訊息("msgTempleList", arr精舍代碼清單.length > 0 ? "" : "目前尚未有任何精舍，請先於上方新增。", "info");
+
+    // 同步更新「修改精舍設定」下拉選單
+    const elSelectEdit = document.getElementById("selectEditTemple");
+    elSelectEdit.innerHTML = "<option value=\"\">請選擇精舍代碼...</option>";
+    arr精舍代碼清單.forEach(function (str精舍代碼) {
+      const elOption = document.createElement("option");
+      elOption.value = str精舍代碼;
+      elOption.textContent = str精舍代碼 + "（" + obj目前精舍清單快取[str精舍代碼].顯示名稱 + "）";
+      elSelectEdit.appendChild(elOption);
+    });
+
+    // 同步更新「異動記錄查詢」篩選下拉選單（保留「全部精舍」選項在最前面）
+    const elSelectLog = document.getElementById("selectLogTempleFilter");
+    elSelectLog.innerHTML = "<option value=\"\">全部精舍</option>";
+    arr精舍代碼清單.forEach(function (str精舍代碼) {
+      const elOption = document.createElement("option");
+      elOption.value = str精舍代碼;
+      elOption.textContent = str精舍代碼;
+      elSelectLog.appendChild(elOption);
+    });
+  } catch (錯誤) {
+    console.error("載入精舍清單時發生未預期錯誤：", 錯誤);
+    顯示區塊訊息("msgTempleList", "系統發生未預期錯誤，請稍後再試或聯絡工程人員。", "error");
+  }
+}
+
+/**
+ * ------------------------------------------------------------
+ * 函式：處理清單修改按鈕點擊
+ * 版本：v1.0（2026-09-19）
+ * 用途：精舍清單表格中每一列的「修改」按鈕，點擊後自動捲動到
+ *       「修改精舍設定」卡片、選取對應精舍，並直接載入其資料，
+ *       省去使用者自己再去下拉選單找一次的步驟。
+ * 參數：
+ *   str精舍代碼 - 要修改的精舍代碼
+ * 回傳：無
+ * ------------------------------------------------------------
+ */
+function 處理清單修改按鈕點擊(str精舍代碼) {
+  document.getElementById("selectEditTemple").value = str精舍代碼;
+  document.getElementById("selectEditTemple").scrollIntoView({ behavior: "smooth", block: "center" });
+  處理載入精舍資料按鈕點擊();
+}
+
+/**
+ * ------------------------------------------------------------
+ * 函式：處理載入精舍資料按鈕點擊
+ * 版本：v1.0（2026-09-19）
+ * 用途：讀取下拉選單選擇的精舍代碼，從「載入精舍清單」時已快取
+ *       的資料中取出該精舍設定，帶入修改表單各欄位（密碼／Email／
+ *       6 種試算表 ID 皆先留空，代表「不修改」，避免顯示密碼明碼
+ *       在表單中造成不必要的曝光；顯示名稱可直接帶入方便微調）。
+ * 參數：無（直接從下拉選單讀取）
+ * 回傳：無
+ * ------------------------------------------------------------
+ */
+function 處理載入精舍資料按鈕點擊() {
+  const str精舍代碼 = document.getElementById("selectEditTemple").value;
+
+  if (!str精舍代碼) {
+    顯示區塊訊息("msgEditTemple", "請先選擇要修改的精舍代碼。", "error");
+    return;
+  }
+
+  const obj精舍資料 = obj目前精舍清單快取[str精舍代碼];
+  if (!obj精舍資料) {
+    顯示區塊訊息("msgEditTemple", "找不到這個精舍的資料，請先按「重新整理清單」後再試一次。", "error");
+    return;
+  }
+
+  document.getElementById("inputEditDisplayName").value = obj精舍資料.顯示名稱 || "";
+  document.getElementById("inputEditPassword").value = "";
+  document.getElementById("inputEditEmail").value = "";
+  ARR_試算表欄位名稱.forEach(function (str欄位名稱) {
+    document.getElementById("inputEdit" + str欄位名稱).value = "";
+  });
+
+  document.getElementById("editTempleFields").style.display = "block";
+  顯示區塊訊息(
+    "msgEditTemple",
+    "已載入「" + str精舍代碼 + "」目前的顯示名稱；密碼／Email／試算表 ID 欄位留空代表沿用原值，只有實際輸入的欄位才會被修改。",
+    "info"
+  );
+}
+
+/**
+ * ------------------------------------------------------------
+ * 函式：處理儲存精舍修改按鈕點擊
+ * 版本：v1.0（2026-09-19）
+ * 用途：組合「變更欄位」物件（只放使用者實際有輸入的欄位），
+ *       呼叫「修改精舍設定」API。顯示名稱因為表單已預先帶入
+ *       目前值，只要與載入時不同就一併送出；密碼／Email／
+ *       試算表 ID 則只有欄位非空白才送出，避免誤清空原本設定。
+ * 參數：無（直接從畫面欄位讀取）
+ * 回傳：無
+ * ------------------------------------------------------------
+ */
+async function 處理儲存精舍修改按鈕點擊() {
+  const str精舍代碼 = document.getElementById("selectEditTemple").value;
+  const obj登入資訊 = 取得目前登入管理者資訊();
+
+  if (!obj登入資訊) {
+    顯示區塊訊息("msgEditTemple", "登入狀態已失效，請重新登入。", "error");
+    處理登出按鈕點擊();
+    return;
+  }
+
+  if (!str精舍代碼) {
+    顯示區塊訊息("msgEditTemple", "請先選擇並載入要修改的精舍。", "error");
+    return;
+  }
+
+  const obj變更欄位 = {};
+
+  const str新顯示名稱 = document.getElementById("inputEditDisplayName").value.trim();
+  if (str新顯示名稱) { obj變更欄位["顯示名稱"] = str新顯示名稱; }
+
+  const str新密碼 = document.getElementById("inputEditPassword").value.trim();
+  if (str新密碼) { obj變更欄位["密碼"] = str新密碼; }
+
+  const str新Email = document.getElementById("inputEditEmail").value.trim();
+  if (str新Email) {
+    if (str新Email.indexOf("@") === -1) {
+      顯示區塊訊息("msgEditTemple", "精舍 Email 格式看起來不正確（缺少 @），請重新確認，或留空不修改。", "error");
+      return;
+    }
+    obj變更欄位["精舍Email"] = str新Email;
+  }
+
+  ARR_試算表欄位名稱.forEach(function (str欄位名稱) {
+    const str輸入值 = document.getElementById("inputEdit" + str欄位名稱).value.trim();
+    if (str輸入值) { obj變更欄位[str欄位名稱] = str輸入值; }
+  });
+
+  if (Object.keys(obj變更欄位).length === 0) {
+    顯示區塊訊息("msgEditTemple", "沒有任何欄位變更，請至少修改一項後再儲存。", "error");
+    return;
+  }
+
+  const btn儲存按鈕 = document.getElementById("btnSaveTempleDetail");
+  btn儲存按鈕.disabled = true;
+  顯示區塊訊息("msgEditTemple", "儲存中，請稍候...", "info");
+
+  try {
+    const objResult = await 呼叫後端API({
+      system: "admin",
+      action: "修改精舍設定",
+      token: obj登入資訊.token,
+      精舍代碼: str精舍代碼,
+      變更欄位: obj變更欄位
+    });
+
+    if (objResult.成功) {
+      顯示區塊訊息("msgEditTemple", objResult.訊息 || "修改成功。", "success");
+      await 載入精舍清單();
+      document.getElementById("selectEditTemple").value = str精舍代碼;
+    } else {
+      顯示區塊訊息("msgEditTemple", objResult.訊息 || "修改失敗，請確認輸入內容是否正確。", "error");
+    }
+  } catch (錯誤) {
+    console.error("儲存精舍修改過程發生未預期錯誤：", 錯誤);
+    顯示區塊訊息("msgEditTemple", "系統發生未預期錯誤，請稍後再試或聯絡工程人員。", "error");
+  } finally {
+    btn儲存按鈕.disabled = false;
+  }
+}
+
+/**
+ * ------------------------------------------------------------
+ * 函式：處理查詢異動記錄按鈕點擊
+ * 版本：v1.0（2026-09-19）
+ * 用途：呼叫「取得異動記錄」API，依下拉選單選擇的精舍代碼篩選
+ *       （空白代表全部精舍），結果依時間新到舊排列成表格。
+ * 參數：無（直接從下拉選單讀取）
+ * 回傳：無
+ * ------------------------------------------------------------
+ */
+async function 處理查詢異動記錄按鈕點擊() {
+  const obj登入資訊 = 取得目前登入管理者資訊();
+  if (!obj登入資訊) {
+    顯示區塊訊息("msgChangeLog", "登入狀態已失效，請重新登入。", "error");
+    處理登出按鈕點擊();
+    return;
+  }
+
+  const str篩選精舍代碼 = document.getElementById("selectLogTempleFilter").value;
+  const btn查詢按鈕 = document.getElementById("btnQueryLog");
+  btn查詢按鈕.disabled = true;
+  顯示區塊訊息("msgChangeLog", "查詢中，請稍候...", "info");
+
+  try {
+    const objResult = await 呼叫後端API({
+      system: "admin",
+      action: "取得異動記錄",
+      token: obj登入資訊.token,
+      精舍代碼: str篩選精舍代碼
+    });
+
+    if (!objResult.成功) {
+      顯示區塊訊息("msgChangeLog", objResult.訊息 || "查詢異動記錄失敗。", "error");
+      return;
+    }
+
+    const arr記錄清單 = objResult.記錄清單 || [];
+    const elTbody = document.getElementById("tbodyChangeLog");
+    elTbody.innerHTML = "";
+    arr記錄清單.forEach(function (obj一筆記錄) {
+      const elTr = document.createElement("tr");
+      elTr.innerHTML =
+        "<td class=\"mono\">" + 轉義HTML(obj一筆記錄.時間) + "</td>" +
+        "<td>" + 轉義HTML(obj一筆記錄.精舍代碼) + "</td>" +
+        "<td>" + 轉義HTML(obj一筆記錄.操作來源) + "</td>" +
+        "<td>" + 轉義HTML(obj一筆記錄.異動摘要) + "</td>";
+      elTbody.appendChild(elTr);
+    });
+
+    document.getElementById("tableChangeLog").style.display = arr記錄清單.length > 0 ? "table" : "none";
+    顯示區塊訊息("msgChangeLog", arr記錄清單.length > 0 ? "" : "沒有符合條件的異動記錄。", "info");
+  } catch (錯誤) {
+    console.error("查詢異動記錄過程發生未預期錯誤：", 錯誤);
+    顯示區塊訊息("msgChangeLog", "系統發生未預期錯誤，請稍後再試或聯絡工程人員。", "error");
+  } finally {
+    btn查詢按鈕.disabled = false;
+  }
+}
+
+/**
+ * ------------------------------------------------------------
+ * 函式：初始化頁面
+ * 版本：v1.0（2026-09-19）
+ * 用途：頁面載入時執行，檢查管理者登入狀態；已登入則直接顯示
+ *       主內容並載入精舍清單，未登入則顯示登入表單。
+ * 參數：無
+ * 回傳：無
+ * ------------------------------------------------------------
+ */
+async function 初始化頁面() {
+  document.getElementById("loadingNotice").style.display = "none";
+
+  const obj登入資訊 = 取得目前登入管理者資訊();
+  if (obj登入資訊) {
+    document.getElementById("mainContent").style.display = "block";
+    await 載入精舍清單();
+  } else {
+    document.getElementById("loginBox").style.display = "block";
+  }
+}
+
+初始化頁面();
+
+</script>
+
+</body>
+</html>
