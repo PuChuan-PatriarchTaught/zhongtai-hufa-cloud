@@ -6,6 +6,8 @@
  *   - v1.1（2026-09-18）：「呼叫後端API」新增「連線失敗自動重試
  *     一次」機制，改善 Apps Script Web App 閒置後第一次呼叫偶爾
  *     連線失敗的現象（詳見該函式的變更說明）。
+ *   - 2026-09-19：WEB_APP_網址 由待填佔位文字改填正式部署網址
+ *     （不算邏輯變更，故不列入版本號，僅記錄異動時間點）。
  * 說明：
  *   護法會雲端系統的前端共用設定，提報系統、報到系統、精舍後台
  *   管理等所有頁面都引用這份設定檔，未來若 Web App 網址變更
@@ -13,8 +15,8 @@
  * ============================================================
  */
 
-// 【待您填入】部署 Apps Script Web App 後拿到的網址
-const WEB_APP_網址 = "請填入您部署 Apps Script 後拿到的網址，例如 https://script.google.com/macros/s/xxxxx/exec";
+// 部署 Apps Script Web App 後拿到的網址（2026-09-19 填入正式部署網址）
+const WEB_APP_網址 = "https://script.google.com/macros/s/AKfycby5gQrRgR4rXzW9BSnmJ7_-jOvqb1OunMSquHiq0xQTsxuBWY0Y6BftEQYRpTeAHi8g/exec";
 
 // 精舍登入後，token 存在瀏覽器 sessionStorage 時使用的 key 名稱，統一集中管理避免打錯字
 const SESSION_KEY_精舍TOKEN = "護法會雲端系統_精舍token";
