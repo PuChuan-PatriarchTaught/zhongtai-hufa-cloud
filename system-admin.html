@@ -8,7 +8,7 @@
   /*
    * ============================================================
    * 檔案：系統管理後台頁面（總管理員專用）
-   * 版本：v1.1（2026-09-19）
+   * 版本：v1.2（2026-09-19）
    * 版本歷程：
    *   - v1.0（2026-09-19）：初版，提供新增精舍／精舍清單／修改精舍
    *     設定／異動記錄查詢 4 項功能。
@@ -17,6 +17,10 @@
    *     載入該精舍資料摘要，並輸入精舍代碼二次確認才能執行刪除，
    *     降低手滑誤刪的風險；精舍清單表格「操作」欄也同步加上
    *     「刪除」按鈕，點擊後直接帶入刪除卡片。
+   *   - v1.2（2026-09-19）：修正「修改精舍設定」卡片的盲點——載入
+   *     資料時 Email／6 種試算表 ID 欄位改為直接帶入目前實際值
+   *     （原本一律留空，只能靠「已設定 N / 6」摘要猜缺哪個欄位）。
+   *     密碼欄位基於安全考量維持留空、不顯示明碼。
    * 說明：
    *   總管理員（法師／中台統一管理帳號）專用的後台頁面，網址不對外
    *   公開連結、也不出現在精舍登入頁面（login.html）上，僅供知道
@@ -261,7 +265,9 @@
   <div class="card">
     <h2>修改精舍設定（救援用）</h2>
     <div class="desc">
-      選擇精舍代碼後按「載入」，會帶出目前設定；留空的欄位在儲存時不會覆蓋原本的值。
+      選擇精舍代碼後按「載入」，會帶出目前設定；Email／6 種試算表 ID 欄位會直接顯示目前已存的實際內容，
+      可直接修改覆蓋，若不想變更請保持原樣即可。密碼欄位基於安全考量固定留空，不顯示明碼，
+      需要重設密碼時才手動輸入新密碼；欲查看目前密碼明碼請至上方「精舍清單」表格點擊「顯示」。
       此功能供精舍忘記密碼、試算表 ID 設定錯誤等狀況時，由總管理員協助修正。
     </div>
 
@@ -276,10 +282,10 @@
       <label for="inputEditDisplayName">顯示名稱</label>
       <input type="text" id="inputEditDisplayName" autocomplete="off">
 
-      <label for="inputEditPassword">密碼（留空表示不修改）</label>
+      <label for="inputEditPassword">密碼（留空表示不修改，安全考量不顯示目前明碼）</label>
       <input type="text" id="inputEditPassword" autocomplete="off">
 
-      <label for="inputEditEmail">精舍 Email（留空表示不修改）</label>
+      <label for="inputEditEmail">精舍 Email（顯示目前設定值，可直接修改）</label>
       <input type="text" id="inputEditEmail" autocomplete="off">
 
       <label for="inputEdit資料庫試算表ID">資料庫試算表ID</label>
@@ -699,11 +705,17 @@ function 處理清單修改按鈕點擊(str精舍代碼) {
 /**
  * ------------------------------------------------------------
  * 函式：處理載入精舍資料按鈕點擊
- * 版本：v1.0（2026-09-19）
+ * 版本：v1.1（2026-09-19）
+ * 版本歷程：
+ *   - v1.0（2026-09-19）：初版，密碼／Email／6 種試算表 ID 欄位
+ *     皆先留空，代表「不修改」。
+ *   - v1.1（2026-09-19）：修正盲點——Email 與 6 種試算表 ID 欄位
+ *     改為直接帶入目前已存的實際內容，方便總管理員一眼看出哪些
+ *     欄位還沒設定、哪些已經設定，不用再去猜「已設定 N / 6」摘要
+ *     裡缺的是哪幾個。密碼欄位基於安全考量，仍維持留空、不顯示
+ *     明碼（要看密碼明碼請到「精舍清單」表格用「顯示」按鈕查看）。
  * 用途：讀取下拉選單選擇的精舍代碼，從「載入精舍清單」時已快取
- *       的資料中取出該精舍設定，帶入修改表單各欄位（密碼／Email／
- *       6 種試算表 ID 皆先留空，代表「不修改」，避免顯示密碼明碼
- *       在表單中造成不必要的曝光；顯示名稱可直接帶入方便微調）。
+ *       的資料中取出該精舍設定，帶入修改表單各欄位。
  * 參數：無（直接從下拉選單讀取）
  * 回傳：無
  * ------------------------------------------------------------
@@ -723,16 +735,19 @@ function 處理載入精舍資料按鈕點擊() {
   }
 
   document.getElementById("inputEditDisplayName").value = obj精舍資料.顯示名稱 || "";
+  // 密碼基於安全考量固定留空，不把明碼帶進表單（避免密碼明碼出現在畫面／瀏覽器紀錄中）
   document.getElementById("inputEditPassword").value = "";
-  document.getElementById("inputEditEmail").value = "";
+  // Email 與 6 種試算表 ID 改為直接帶入目前實際值，方便一眼看出缺哪個欄位
+  document.getElementById("inputEditEmail").value = obj精舍資料.精舍Email || "";
   ARR_試算表欄位名稱.forEach(function (str欄位名稱) {
-    document.getElementById("inputEdit" + str欄位名稱).value = "";
+    document.getElementById("inputEdit" + str欄位名稱).value = obj精舍資料[str欄位名稱] || "";
   });
 
   document.getElementById("editTempleFields").style.display = "block";
   顯示區塊訊息(
     "msgEditTemple",
-    "已載入「" + str精舍代碼 + "」目前的顯示名稱；密碼／Email／試算表 ID 欄位留空代表沿用原值，只有實際輸入的欄位才會被修改。",
+    "已載入「" + str精舍代碼 + "」目前的設定內容（密碼除外）。Email／試算表 ID 欄位可直接修改覆蓋，" +
+    "若該欄位保持原樣則沿用原值；密碼欄位留空表示不修改，需要重設時才輸入新密碼。",
     "info"
   );
 }
